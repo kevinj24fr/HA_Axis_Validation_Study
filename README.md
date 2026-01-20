@@ -1,8 +1,21 @@
-# Neural Implant Transcriptomics Validation Analysis
+# HA Axis Validation Study — Neural Implant Transcriptomics (Paper Companion)
 
-## Background
+## What this repository is
 
-Neural implants trigger a foreign body response (FBR) that can compromise device performance over time. Understanding the molecular dynamics of this response is critical for developing biocompatible neural interfaces.
+This repository is a **paper companion** that reproduces the core transcriptomic analyses used to test whether **extracellular matrix (ECM) remodeling “axes”**—identified previously in **brain injury (BI)** and **spinal cord injury (SCI)**—are also engaged after **flexible neural probe implantation**.
+
+If you are here to **understand the paper**, start with:
+
+- **Main figure (compiled)**: `figures/main/Figure_Main.pdf`
+- **Supplementary figures**: `figures/supplementary/`
+- **Key result tables**: `results/` (subfolders described below)
+
+## Biological question
+
+Neural implants trigger a foreign body response (FBR) that can compromise device performance over time. Here, we ask:
+
+- **Do the ECM axes (especially the Hyaluronan axis) activate after implantation?**
+- **How do those responses evolve over time** (acute → subacute → chronic)?
 
 Analysis of brain injury (BI) and spinal cord injury (SCI) transcriptomics identified six extracellular matrix (ECM) axes that define tissue remodeling phases:
 
@@ -15,7 +28,7 @@ Analysis of brain injury (BI) and spinal cord injury (SCI) transcriptomics ident
 | **Proteases/Regulators** | MMPs, ADAMTSs, TIMPs |
 | **Crosslinking/Fibrosis** | LOX enzymes, fibrillar collagens |
 
-This analysis validates whether these ECM axes—particularly the Hyaluronan axis—are activated in response to flexible neural probe implantation.
+This pipeline quantifies those axes in implant vs contralateral control tissue across time, then summarizes findings in publication-ready figures.
 
 ## Study Design
 
@@ -28,30 +41,66 @@ This analysis validates whether these ECM axes—particularly the Hyaluronan axi
 | Samples | n = 63 (31 implant, 32 control) |
 | Timepoints | Day 0 (4h), 7, 14, 28, 126 |
 
+## “What should I look at?” (paper-oriented guide)
+
+- **Axis-level activation across time**: `results/axis_scoring/axis_activation_stats.csv`
+- **Differential expression (per timepoint)**: `results/deg/deg_significant_Week*.csv`
+- **Pathway/gene set enrichment (including literature signatures)**: `results/ha_analysis/gsea_all_results.csv`
+- **Temporal pattern classes (resolving/persistent/late, etc.)**: `results/temporal/gene_temporal_classification.csv`
+- **Module-level summaries (module eigengenes / preservation-style summaries)**: `results/preservation/module_preservation_summary.csv`
+
 ## Repository Structure
 
 ```
-analysis/
+.
 ├── README.md                    # This file
-├── config.R                     # File paths and parameters
-├── run_analysis.sh              # Pipeline execution script
 ├── scripts/
 │   ├── 01_data_processing.R     # CEL file loading, RMA normalization, QC
 │   ├── 02_annotation_mapping.R  # Probe-to-gene mapping, ortholog translation
-│   ├── 03_differential_expression.R  # Paired limma analysis
+│   ├── 03_differential_expression.R  # Unpaired limma analysis
 │   ├── 04_axis_scoring.R        # ssGSEA pathway scoring
 │   ├── 05_temporal_dynamics.R   # Gene temporal classification
-│   ├── 06_module_preservation.R # WGCNA module eigengene analysis
-│   ├── 07_pathway_enrichment.R  # fGSEA, literature signature validation
-│   └── 08_figure_generation.R   # Main and supplementary figures
-├── R/
-│   └── theme_publication.R      # ggplot2 theme and color palettes
-├── docs/                        # Script documentation
-├── results/                     # Analysis outputs (.csv, .rds)
-└── figures/                     # Generated plots (.pdf, .png)
+│   ├── 06_module_preservation.R # Module eigengene / preservation analysis
+│   ├── 07_pathway_enrichment.R  # fGSEA + literature signature validation
+│   ├── config.R                 # Shared paths/parameters used by scripts
+│   └── theme_publication.R      # Plot theme + save helper used by scripts
+├── docs/                        # Script documentation (inputs/outputs/methods)
+├── results/                     # Generated analysis outputs (.csv, .rds) [created by scripts]
+└── figures/                     # Generated plots (.pdf, .png) [created by scripts]
 ```
 
-## Running the Pipeline
+## Reproducing the analysis (01 → 08)
+
+The pipeline is **linear**: each script writes outputs used by the next script. Run them in order:
+
+- **`scripts/01_data_processing.R`**: normalize microarray CEL files (RMA) + QC + sample metadata
+- **`scripts/02_annotation_mapping.R`**: map probes → genes; build gene-level matrix; create ECM gene sets
+- **`scripts/03_differential_expression.R`**: implant vs control differential expression at each timepoint
+- **`scripts/04_axis_scoring.R`**: compute axis scores per sample (ssGSEA) + stats across time
+- **`scripts/05_temporal_dynamics.R`**: classify genes/axes by temporal behavior across the full time course
+- **`scripts/06_module_preservation.R`**: module eigengene/activity summaries using manuscript-derived modules
+- **`scripts/07_pathway_enrichment.R`**: gene set enrichment and literature signature validation
+
+For step-by-step inputs/outputs, see `docs/` (one markdown page per script).
+
+## Data requirements (what you need to provide)
+
+This pipeline expects **raw Affymetrix CEL files** arranged as below:
+
+```
+Data/arrays/
+├── Controls/
+│   ├── Control_1.CEL ... Control_4.CEL   # Baseline
+│   ├── Week0_1.CEL ... Week0_5.CEL       # Day 0 (4h)
+│   ├── Week1_1.CEL ... Week1_5.CEL       # Day 7
+│   ├── Week2_1.CEL ... Week2_6.CEL       # Day 14
+│   ├── Week4_1.CEL ... Week4_6.CEL       # Day 28
+│   └── Week18_1.CEL ... Week18_6.CEL     # Day 126
+└── Implants/
+    └── [same structure]
+```
+
+## Running the Pipeline (R packages)
 
 ### Prerequisites
 
@@ -69,23 +118,6 @@ install.packages(c("tidyverse", "patchwork", "pheatmap"))
 ### Execution
 
 Scripts must be run in order (01 → 08) as each depends on outputs from previous scripts.
-
-## Data Requirements
-
-CEL files should be organized as:
-
-```
-Data/arrays/
-├── Controls/
-│   ├── Control_1.CEL ... Control_4.CEL   # Baseline
-│   ├── Week0_1.CEL ... Week0_5.CEL       # Day 0 (4h)
-│   ├── Week1_1.CEL ... Week1_5.CEL       # Day 7
-│   ├── Week2_1.CEL ... Week2_6.CEL       # Day 14
-│   ├── Week4_1.CEL ... Week4_6.CEL       # Day 28
-│   └── Week18_1.CEL ... Week18_6.CEL     # Day 126
-└── Implants/
-    └── [same structure]
-```
 
 ## Outputs
 
@@ -105,6 +137,14 @@ Data/arrays/
 ## Documentation
 
 See `docs/` for detailed documentation of each script, including inputs, outputs, and methods.
+
+## Glossary (quick definitions)
+
+- **DEG**: differentially expressed gene (implant vs control)
+- **FDR**: false discovery rate (multiple testing-adjusted p-value)
+- **logFC**: log2 fold change (positive = higher in implant)
+- **ssGSEA / axis score**: per-sample gene set score summarizing coordinated expression of an axis
+- **NES**: normalized enrichment score from gene set enrichment analysis (fGSEA)
 
 ## License
 
